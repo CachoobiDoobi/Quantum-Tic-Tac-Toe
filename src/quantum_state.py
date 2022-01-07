@@ -75,10 +75,10 @@ class QuantumState:
     def __execute(self):
         self.reset()
         for command in self.command_queue:
-            if command.id is "move": self.__move(*command.data)
-            elif command.id is "entangle": self.__entangle(*command.data)
-            elif command.id is "swap": self.__swap(*command.data)
-            elif command.id is "measure": self.__measure(*command.data)
+            if command.id == "move": self.__move(*command.data)
+            elif command.id == "entangle": self.__entangle(*command.data)
+            elif command.id == "swap": self.__swap(*command.data)
+            elif command.id == "measure": self.__measure(*command.data)
             else: print(f"Unknown command {command.id}")
         self.engine.flush()
 
