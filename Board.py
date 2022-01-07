@@ -91,7 +91,6 @@ class Board:
                 to_measure.add(qx)
                 queue.update(qx.entangled)
 
-        print(to_measure)
         # do the measurement
         # convert results to board X and Os
         # dummy result array
