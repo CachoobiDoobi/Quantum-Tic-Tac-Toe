@@ -96,6 +96,20 @@ class QuantumState:
         #   Normalise resulting probabilities
         #   Fill initial_states array
 
+        filtered_probs = {} # The filtered dictionary
+
+        """Renormalizing all the probabilites, and storing them in self.intial_states (array)"""
+
+        inv_normalisation = sum(filtered_probs.values())
+        for key in filtered_probs:
+            filtered_probs[key] = filtered_probs[key] / inv_normalisation
+
+        self.initial_states = []
+        for i in range(len(filtered_probs)):
+            prob = 0
+            for key in filtered_probs:
+                prob += int(key[i]) * filtered_probs[key]
+            self.initial_states.append(prob)
 
         # "0100" ~0.25 => [ 0.5, 1, 0.5, 0.5 ]
         # "0000" ~0.25
@@ -104,10 +118,7 @@ class QuantumState:
 
         # "0100" ~0.5, "1100" ~0.5
         # send [0.5, 1, 1, 1] 
-
-        
-
-        self.initial_states = [] 
+ 
 
         self.command_queue = [] # Clear the command queue
 
