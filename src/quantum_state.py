@@ -75,14 +75,14 @@ class QuantumState:
     def __execute(self):
         self.reset()
         for command in self.command_queue:
-            if command["id"] is "move": self.__move(*command["data"])
-            elif command["id"] is "entangle": self.__entangle(*command["data"])
-            elif command["id"] is "swap": self.__swap(*command["data"])
-            elif command["id"] is "measure": self.__measure(*command["data"])
+            if command["id"] == "move": self.__move(*command["data"])
+            elif command["id"] == "entangle": self.__entangle(*command["data"])
+            elif command["id"] == "swap": self.__swap(*command["data"])
+            elif command["id"] == "measure": self.__measure(*command["data"])
             else: print(f"Unknown command {command['id']}")
         self.engine.flush()
 
-        index = self.qubits[self.command_queue[-1].data[0]]
+        index = self.qubits[self.command_queue[-1]["data"][0]]
 
         mresult = self.engine.get_measurement_result(index) # Returns the result of the measurement of qubit `index`
         probabilities = self.qi_backend.get_probabilities(self.qubits) # Returns all possible states with their probabilities
@@ -197,3 +197,6 @@ class QuantumState:
 
     def __swap(self, q1, q2):
         Swap | (self.qubits[q1], self.qubits[q2])
+
+qs = QuantumState(2)
+qs.measure(1, 1)
