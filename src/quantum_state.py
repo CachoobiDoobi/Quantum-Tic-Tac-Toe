@@ -5,21 +5,21 @@ import numpy as np
 from projectq import MainEngine
 from projectq.backends import ResourceCounter
 from projectq.meta import Dagger
-from projectq.ops import H, All, Ry, TGate, CNOT, SGate, Swap, Measure
+from projectq.ops import H, Ry, TGate, CNOT, SGate, Swap, Measure
 from projectq.setups import restrictedgateset
 
 from quantuminspire.api import QuantumInspireAPI
 from quantuminspire.credentials import get_authentication
 from quantuminspire.projectq.backend_qx import QIBackend
 
-QI_URL = os.getenv('API_URL', 'https://api.quantum-inspire.com/')
+QI_URL = os.getenv("API_URL", "https://api.quantum-inspire.com/")
 
-project_name = 'TicTacToe'
+project_name = "TicTacToe"
 authentication = get_authentication()
 qi_api = QuantumInspireAPI(QI_URL, authentication=authentication, project_name=project_name)
 
 class QuantumState:
-    'Quantum state manager'
+    "Quantum state manager"
 
     def __init__(self, size=3):
         """ Create a new QuantumState and perform the setup.
@@ -75,11 +75,11 @@ class QuantumState:
     def __execute(self):
         self.reset()
         for command in self.command_queue:
-            if command.id is "move": self.__move(*command.data)
-            elif command.id is "entangle": self.__entangle(*command.data)
-            elif command.id is "swap": self.__swap(*command.data)
-            elif command.id is "measure": self.__measure(*command.data)
-            else: print(f"Unknown command {command.id}")
+            if command["id"] is "move": self.__move(*command["data"])
+            elif command["id"] is "entangle": self.__entangle(*command["data"])
+            elif command["id"] is "swap": self.__swap(*command["data"])
+            elif command["id"] is "measure": self.__measure(*command["data"])
+            else: print(f"Unknown command {command['id']}")
         self.engine.flush()
 
         index = self.qubits[self.command_queue[-1].data[0]]
@@ -87,19 +87,22 @@ class QuantumState:
         mresult = self.engine.get_measurement_result(index) # Returns the result of the measurement of qubit `index`
         probabilities = self.qi_backend.get_probabilities(self.qubits) # Returns all possible states with their probabilities
 
+        print(mresult)
+        print(probabilities)
+
         # TODO:
         #   Filter qubit strings based on result of measurement
-        #   Filter probabilities array => { '10101110': 0.5, '10101110': 0.3, ... }
+        #   Filter probabilities array => { "10101110": 0.5, "10101110": 0.3, ... }
         #   Normalise resulting probabilities
         #   Fill initial_states array
 
 
-        # '0100' ~0.25 => [ 0.5, 1, 0.5, 0.5 ]
-        # '0000' ~0.25
-        # '1100' ~0.25
-        # '1000' ~0.25
+        # "0100" ~0.25 => [ 0.5, 1, 0.5, 0.5 ]
+        # "0000" ~0.25
+        # "1100" ~0.25
+        # "1000" ~0.25
 
-        # '0100' ~0.5, '1100' ~0.5
+        # "0100" ~0.5, "1100" ~0.5
         # send [0.5, 1, 1, 1] 
 
         
@@ -188,7 +191,7 @@ class QuantumState:
             q1, q2 (int): The qubits which need to be swapped (value from 0 to 8)                    
         """
         self.command_queue.append({
-            "id": "move",
+            "id": "swap",
             "data": [ q1, q2 ]
         })
 
