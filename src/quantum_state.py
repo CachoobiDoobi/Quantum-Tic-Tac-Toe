@@ -105,7 +105,7 @@ class QuantumState:
             filtered_probs[key] = filtered_probs[key] / inv_normalisation
 
         self.initial_states = []
-        for i in range(len(filtered_probs)):
+        for i in range(self.size ** 2):
             prob = 0
             for key in filtered_probs:
                 prob += int(key[i]) * filtered_probs[key]
