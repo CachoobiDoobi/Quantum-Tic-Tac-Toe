@@ -1,22 +1,17 @@
 import os
+import re
 
 import numpy as np
 
-from projectq import MainEngine
-from projectq.backends import ResourceCounter
-from projectq.meta import Dagger
-from projectq.ops import H, Ry, TGate, CNOT, SGate, Swap, Measure
-from projectq.setups import restrictedgateset
-
 from quantuminspire.api import QuantumInspireAPI
 from quantuminspire.credentials import get_authentication
-from quantuminspire.projectq.backend_qx import QIBackend
 
 QI_URL = os.getenv("API_URL", "https://api.quantum-inspire.com/")
 
 project_name = "TicTacToe"
 authentication = get_authentication()
 qi_api = QuantumInspireAPI(QI_URL, authentication=authentication, project_name=project_name)
+qi_backend = qi_api.get_backend_type_by_name('QX single-node simulator')
 
 class QuantumState:
     "Quantum state manager"
@@ -28,37 +23,31 @@ class QuantumState:
             size (int): The width and height of the board
         """
         self.size = size
+        self.qubit_count = self.size ** 2
         self.command_queue = []
-        self.initial_states = [0.5 for _ in range(size ** 2)] # probabilities to be in the |1> state
-        self.setup()
+        self.initial_states = [0.5 for _ in range(self.qubit_count)] # probabilities to be in the |1> state
+        self.qasm = ""
     
 
     def __initialise_qubits(self):
-        """Allocate the qubits and place them in the |+> state."""
-        self.qubits = self.engine.allocate_qureg(self.size ** 2)
-        for i in range(len(self.qubits)):
-            Ry(np.pi * self.initial_states[i]) | self.qubits[i]
+        """Return the qasm code to allocate and initialise the qubits"""
+        return f"""qubits {self.qubit_count}
+
+        {{ {' | '.join([ f"Ry q[{i}], {np.pi * self.initial_states[i]}" for i in range(self.qubit_count) ])} }}
+        """
 
     
-    def setup(self):
-        """Initialise a new backend, engine and qubit register."""
-        self.qi_backend = QIBackend(quantum_inspire_api=qi_api)
-        self.compiler_engines = restrictedgateset.get_engine_list(
-            one_qubit_gates=self.qi_backend.one_qubit_gates,
-            two_qubit_gates=self.qi_backend.two_qubit_gates,
-            other_gates=self.qi_backend.three_qubit_gates
-        )
+    def __setup(self):
+        """Return the qasm setup code."""
+        return f"""version 1.0
 
-        self.compiler_engines.extend([ResourceCounter()])
-        self.engine = MainEngine(backend=self.qi_backend, engine_list=self.compiler_engines)
+        { self.__initialise_qubits() }
+        """
 
-        self.__initialise_qubits()
-    
 
     def reset(self):
-        """Flush the current circuit, deallocate the qubits and perform the setup."""
-        self.engine.flush(deallocate_qubits=True)
-        self.setup()
+        """Clear the accumulated qasm code."""
+        self.qasm = ""
 
     
     def get_index(self, position):
@@ -72,31 +61,42 @@ class QuantumState:
         return y * self.size + x
 
 
+    def __append_command(self, command):
+        """Append a string containing qasm commands to the accumulated qasm code."""
+        self.qasm += re.sub(r"^[\t ]+", '', command.strip(), flags=re.M) + '\n\n'
+
+
     def __execute(self):
         self.reset()
+        self.__append_command(self.__setup())
+
         for command in self.command_queue:
-            if command["id"] == "move": self.__move(*command["data"])
-            elif command["id"] == "entangle": self.__entangle(*command["data"])
-            elif command["id"] == "swap": self.__swap(*command["data"])
-            elif command["id"] == "measure": self.__measure(*command["data"])
+            next_line = ""
+            if   command["id"] == "move"     : next_line = self.__move(*command["data"])
+            elif command["id"] == "entangle" : next_line = self.__entangle(*command["data"])
+            elif command["id"] == "swap"     : next_line = self.__swap(*command["data"])
+            elif command["id"] == "measure"  : next_line = self.__measure(*command["data"])
             else: print(f"Unknown command {command['id']}")
-        self.engine.flush()
 
-        index = self.qubits[self.command_queue[-1]["data"][0]]
+            self.__append_command(next_line)
 
-        mresult = self.engine.get_measurement_result(index) # Returns the result of the measurement of qubit `index`
-        probabilities = self.qi_backend.get_probabilities(self.qubits) # Returns all possible states with their probabilities
+        self.command_queue = []
 
-        print(mresult)
-        print(probabilities)
+        result = qi_api.execute_qasm(qasm=self.qasm, backend_type=qi_backend, number_of_shots=512, full_state_projection=True)
 
-        # TODO:
-        #   Filter qubit strings based on result of measurement
-        #   Filter probabilities array => { "10101110": 0.5, "10101110": 0.3, ... }
-        #   Normalise resulting probabilities
-        #   Fill initial_states array
+        if len(result["raw_text"]) > 0:  # Error handling, raw_text only contains text when an error has occured
+            print(result["raw_text"])
+            lines = self.qasm.splitlines()
+            log10_linecount = int(np.floor(np.log10(len(lines)))) + 1
+            qasm = "\n".join([ f"{str(index + 1).rjust(log10_linecount, ' ')} |  {line}" for index, line in enumerate(lines) ])
+            print(f"\nIn QASM Code\n\n{qasm}")
+            return
 
-        filtered_probs = {} # The filtered dictionary
+
+        filtered_probs = {}
+        for key, value in result["histogram"].items():
+            filtered_probs[f"{int(key):b}".zfill(self.qubit_count)[::-1]] = value
+
 
         """Renormalizing all the probabilites, and storing them in self.intial_states (array)"""
 
@@ -105,22 +105,11 @@ class QuantumState:
             filtered_probs[key] = filtered_probs[key] / inv_normalisation
 
         self.initial_states = []
-        for i in range(self.size ** 2):
+        for i in range(self.qubit_count):
             prob = 0
             for key in filtered_probs:
                 prob += int(key[i]) * filtered_probs[key]
             self.initial_states.append(prob)
-
-        # "0100" ~0.25 => [ 0.5, 1, 0.5, 0.5 ]
-        # "0000" ~0.25
-        # "1100" ~0.25
-        # "1000" ~0.25
-
-        # "0100" ~0.5, "1100" ~0.5
-        # send [0.5, 1, 1, 1] 
- 
-
-        self.command_queue = [] # Clear the command queue
 
         return self.initial_states
 
@@ -133,7 +122,7 @@ class QuantumState:
         self.__execute()
     
     def __measure(self, q, player_id):
-        Measure | self.qubits[q]
+        return f"Measure_z q[{q}]"
 
 
     def move(self, q, player_id):
@@ -150,10 +139,11 @@ class QuantumState:
         })
 
     def __move(self, q, player_id):
+        angle = -np.pi / 2
         if player_id == 1:
-            Ry(np.pi/2) | self.qubits[q]
-        else:
-            Ry(-np.pi/2) | self.qubits[q]
+            angle = np.pi / 2
+        
+        return f"Ry q[{q}], {angle:.10f}"
 
 
     def entangle(self, q1, q2):
@@ -170,28 +160,21 @@ class QuantumState:
         })
 
     def __entangle(self, q1, q2):
-        CNOT | (self.qubits[q1], self.qubits[q2])
+        return f"""
+        CNOT q[{q1}], q[{q2}]
 
-        H | self.qubits[q1]
-        with Dagger(self.engine):
-            TGate() | self.qubits[q2]
-        TGate() | self.qubits[q1]
-        H | self.qubits[q2]
-        H | self.qubits[q1]
+        {{ H q[{q1}] | Tdag q[{q2}] }}
+        {{ T q[{q1}] | H    q[{q2}] }}
+        H q[{q1}]
+        
+        CNOT q[{q1}], q[{q2}]
+        {{ H q[{q1}] | H q[{q2}] }}
+        Tdag q[{q1}]
+        H    q[{q1}]
 
-        CNOT | (self.qubits[q1], self.qubits[q2])
-
-        H | self.qubits[q1]
-        H | self.qubits[q2]
-        with Dagger(self.engine):
-            TGate() | self.qubits[q1]
-        H | self.qubits[q1]
-
-        CNOT | (self.qubits[q1], self.qubits[q2])
-
-        with Dagger(self.engine):
-            SGate() | self.qubits[q1]
-        SGate() | self.qubits[q2]
+        CNOT q[{q1}], q[{q2}]
+        {{ Sdag q[{q1}] | S q[{q2}] }}
+        """
 
 
     def swap(self, q1, q2):
@@ -207,7 +190,4 @@ class QuantumState:
         })
 
     def __swap(self, q1, q2):
-        Swap | (self.qubits[q1], self.qubits[q2])
-
-qs = QuantumState(2)
-qs.measure(1, 1)
+        return f"swap q[{q1}], q[{q2}]"
