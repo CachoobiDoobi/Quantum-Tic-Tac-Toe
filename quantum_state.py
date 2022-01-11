@@ -13,6 +13,7 @@ authentication = get_authentication()
 qi_api = QuantumInspireAPI(QI_URL, authentication=authentication, project_name=project_name)
 qi_backend = qi_api.get_backend_type_by_name('QX single-node simulator')
 
+
 class QuantumState:
     "Quantum state manager"
 
@@ -25,31 +26,27 @@ class QuantumState:
         self.size = size
         self.qubit_count = self.size ** 2
         self.command_queue = []
-        self.initial_states = [0.5 for _ in range(self.qubit_count)] # probabilities to be in the |1> state
+        self.initial_states = [0.5 for _ in range(self.qubit_count)]  # probabilities to be in the |1> state
         self.qasm = ""
-    
 
     def __initialise_qubits(self):
         """Return the qasm code to allocate and initialise the qubits"""
         return f"""qubits {self.qubit_count}
 
-        {{ {' | '.join([ f"Ry q[{i}], {np.pi * self.initial_states[i]}" for i in range(self.qubit_count) ])} }}
+        {{ {' | '.join([f"Ry q[{i}], {np.pi * self.initial_states[i]}" for i in range(self.qubit_count)])} }}
         """
 
-    
     def __setup(self):
         """Return the qasm setup code."""
         return f"""version 1.0
 
-        { self.__initialise_qubits() }
+        {self.__initialise_qubits()}
         """
-
 
     def reset(self):
         """Clear the accumulated qasm code."""
         self.qasm = ""
 
-    
     def get_index(self, position):
         """ Convert a 2D (x, y) coordinate into a 1D array index.
         
@@ -60,11 +57,9 @@ class QuantumState:
         y = max(0, min(self.size - 1, position[1]))
         return y * self.size + x
 
-
     def __append_command(self, command):
         """Append a string containing qasm commands to the accumulated qasm code."""
         self.qasm += re.sub(r"^[\t ]+", '', command.strip(), flags=re.M) + '\n\n'
-
 
     def __execute(self):
         self.reset()
@@ -72,31 +67,36 @@ class QuantumState:
 
         for command in self.command_queue:
             next_line = ""
-            if   command["id"] == "move"     : next_line = self.__move(*command["data"])
-            elif command["id"] == "entangle" : next_line = self.__entangle(*command["data"])
-            elif command["id"] == "swap"     : next_line = self.__swap(*command["data"])
-            elif command["id"] == "measure"  : next_line = self.__measure(*command["data"])
-            else: print(f"Unknown command {command['id']}")
+            if command["id"] == "move":
+                next_line = self.__move(*command["data"])
+            elif command["id"] == "entangle":
+                next_line = self.__entangle(*command["data"])
+            elif command["id"] == "swap":
+                next_line = self.__swap(*command["data"])
+            elif command["id"] == "measure":
+                next_line = self.__measure(*command["data"])
+            else:
+                print(f"Unknown command {command['id']}")
 
             self.__append_command(next_line)
 
         self.command_queue = []
 
-        result = qi_api.execute_qasm(qasm=self.qasm, backend_type=qi_backend, number_of_shots=512, full_state_projection=True)
+        result = qi_api.execute_qasm(qasm=self.qasm, backend_type=qi_backend, number_of_shots=512,
+                                     full_state_projection=True)
 
         if len(result["raw_text"]) > 0:  # Error handling, raw_text only contains text when an error has occured
             print(result["raw_text"])
             lines = self.qasm.splitlines()
             log10_linecount = int(np.floor(np.log10(len(lines)))) + 1
-            qasm = "\n".join([ f"{str(index + 1).rjust(log10_linecount, ' ')} |  {line}" for index, line in enumerate(lines) ])
+            qasm = "\n".join(
+                [f"{str(index + 1).rjust(log10_linecount, ' ')} |  {line}" for index, line in enumerate(lines)])
             print(f"\nIn QASM Code\n\n{qasm}")
             return
-
 
         filtered_probs = {}
         for key, value in result["histogram"].items():
             filtered_probs[f"{int(key):b}".zfill(self.qubit_count)[::-1]] = value
-
 
         """Renormalizing all the probabilites, and storing them in self.intial_states (array)"""
 
@@ -113,17 +113,15 @@ class QuantumState:
 
         return self.initial_states
 
-
-    def measure(self, q, player_id):
+    def measure(self, q):
         self.command_queue.append({
             "id": "measure",
-            "data": [q, player_id]
+            "data": [q]
         })
-        self.__execute()
-    
-    def __measure(self, q, player_id):
-        return f"Measure_z q[{q}]"
+        return self.__execute()
 
+    def __measure(self, q):
+        return f"Measure_z q[{q}]"
 
     def move(self, q, player_id):
         """ Classic move: rotation about the y-axis.
@@ -135,16 +133,15 @@ class QuantumState:
         """
         self.command_queue.append({
             "id": "move",
-            "data": [ q, player_id ]
+            "data": [q, player_id]
         })
 
     def __move(self, q, player_id):
         angle = -np.pi / 2
         if player_id == 1:
             angle = np.pi / 2
-        
-        return f"Ry q[{q}], {angle:.10f}"
 
+        return f"Ry q[{q}], {angle:.10f}"
 
     def entangle(self, q1, q2):
         """ Entangle move: entangling two qubits.
@@ -156,7 +153,7 @@ class QuantumState:
         """
         self.command_queue.append({
             "id": "entangle",
-            "data": [ q1, q2 ]
+            "data": [q1, q2]
         })
 
     def __entangle(self, q1, q2):
@@ -176,7 +173,6 @@ class QuantumState:
         {{ Sdag q[{q1}] | S q[{q2}] }}
         """
 
-
     def swap(self, q1, q2):
         """ Swap move: swapping two qubits.
 
@@ -186,7 +182,7 @@ class QuantumState:
         """
         self.command_queue.append({
             "id": "swap",
-            "data": [ q1, q2 ]
+            "data": [q1, q2]
         })
 
     def __swap(self, q1, q2):
