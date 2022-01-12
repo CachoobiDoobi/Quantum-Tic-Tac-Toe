@@ -114,15 +114,20 @@ class QuantumState:
         return self.initial_states
 
 
-    def measure(self, q, player_id):
+    def measure(self, q):
+        """ Measure move: collapse an array of qubits
+        
+        Args:
+            q (int[]): Which qubits are to be measured (values from 0 to 8)
+        """
         self.command_queue.append({
             "id": "measure",
-            "data": [q, player_id]
+            "data": [q]
         })
         self.__execute()
     
-    def __measure(self, q, player_id):
-        return f"Measure_z q[{q}]"
+    def __measure(self, q):
+        return f"Measure_z q[{', '.join([str(x) for x in q])}]"
 
 
     def move(self, q, player_id):
@@ -191,3 +196,6 @@ class QuantumState:
 
     def __swap(self, q1, q2):
         return f"swap q[{q1}], q[{q2}]"
+
+qs = QuantumState()
+qs.measure([0, 2, 3])
