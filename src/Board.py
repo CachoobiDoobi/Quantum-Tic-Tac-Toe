@@ -1,10 +1,12 @@
 import numpy as np
+from quantum_state import QuantumState
 
 
 class Board:
     def __init__(self, size=3):
         # initialize board
         self.squares = np.empty((size, size), dtype=Qubit)
+        self.qs = QuantumState()
 
         # create each qubit
         j = 0
@@ -43,14 +45,14 @@ class Board:
 
     def move(self, position: tuple, player):
         # player 1 goes toward 0, player 2 goes toward 1
-        if player == "1":
+        if player == 1:
             self.squares[position[0]][position[1]].probability -= 0.25
+            self.qs.move(position[0] * 3 + position[1], player)
 
-            # do circuit
-        elif player == "2":
+        elif player == 2:
             self.squares[position[0]][position[1]].probability += 0.25
+            self.qs.move(position[0] * 3 + position[1], player)
 
-            # do circuit
         else:
             raise ValueError("Not a valid player: should be 1 or 2")
 
@@ -70,7 +72,7 @@ class Board:
         self.squares[position2[0], position2[1]] = temp
         self.squares[position2[0], position2[1]].position = position1
 
-        # do circuit
+        self.qs.swap(position1[0] * 3 + position1[1], position2[0] * 3 + position2[1])
 
     def entangle(self, position1, position2):
         q1 = self.get_qubit(position1)
@@ -78,29 +80,62 @@ class Board:
         q1.entangled.add(q2)
         q2.entangled.add(q1)
 
-        # do quantum circuit
+        self.qs.entangle(position1[0] * 3 + position1[1], position2[0] * 3 + position2[1])
 
     def measure(self, position1, to_measure=set()):
         q1 = self.get_qubit(position1)
         to_measure.add(q1)
+        positions = []
+        positions.append(q1.position[0] * 3 + q1.position[1])
         queue = set()
         queue.update(q1.entangled)
         while len(queue) != 0:
             qx = queue.pop()
             if qx not in to_measure:
                 to_measure.add(qx)
+                positions.append(qx.position[0] * 3 + qx.position[1])
                 queue.update(qx.entangled)
 
         # do the measurement
+        result = self.qs.measure(positions)
+        print(result)
         # convert results to board X and Os
-        # dummy result array
-        result = [1, 0, 0.5, 0.8, 0, 1, 0.7,0.8,0.9]
         for qubit in to_measure:
             idx = qubit.position[0] * 3 + qubit.position[1]
             if result[idx] == 1:
                 self.squares[qubit.position[0], qubit.position[1]] = "0"
             elif result[idx] == 0:
                 self.squares[qubit.position[0], qubit.position[1]] = "X"
+
+    def show_board(self):
+        board = [[], [], []]
+        for i in range(self.squares.shape[0]):
+            for j in range(self.squares.shape[1]):
+                if isinstance(self.squares[i, j], Qubit):
+                    board[i].append(str(self.squares[i, j].probability))
+                else:
+                    board[i].append(str(self.squares[i, j]))
+        print('   |   |')
+
+        print(' ' + board[0][0] + ' | ' + board[0][1] + ' | ' + board[0][2])
+
+        print('   |   |')
+
+        print('-----------')
+
+        print('   |   |')
+
+        print(' ' + board[1][0] + ' | ' + board[1][1] + ' | ' + board[1][2])
+
+        print('   |   |')
+
+        print('-----------')
+
+        print('   |   |')
+
+        print(' ' + board[2][0] + ' | ' + board[2][1] + ' | ' + board[2][2])
+
+        print('   |   |')
 
 
 class Qubit:
@@ -117,12 +152,9 @@ class Qubit:
 
 # Some function calls
 Board = Board()
-Board.move((0, 0), "2")
-Board.swap((0, 0), (0, 1))
-# Board.check_win()
-Board.entangle((0, 1), (0, 0))
-Board.entangle((0, 0), (1, 2))
-Board.entangle((1, 2), (1, 1))
+Board.move((0, 0), 2)
+Board.measure((0, 0))
 Board.measure((0, 1))
+Board.measure((2, 2))
 
-print(Board.squares)
+Board.show_board()
