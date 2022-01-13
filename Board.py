@@ -97,7 +97,7 @@ class Board:
                 queue.update(qx.entangled)
 
         # do the measurement
-        result = self.qs.measure(position1[0] * 3 + position1[1])
+        result = self.qs.measure(positions)
         print(result)
         # convert results to board X and Os
         for qubit in to_measure:
@@ -115,7 +115,27 @@ class Board:
                     board[i].append(str(self.squares[i, j].probability))
                 else:
                     board[i].append(str(self.squares[i, j]))
-        print(board)
+        print('   |   |')
+
+        print(' ' + board[0][0] + ' | ' + board[0][1] + ' | ' + board[0][2])
+
+        print('   |   |')
+
+        print('-----------')
+
+        print('   |   |')
+
+        print(' ' + board[1][0] + ' | ' + board[1][1] + ' | ' + board[1][2])
+
+        print('   |   |')
+
+        print('-----------')
+
+        print('   |   |')
+
+        print(' ' + board[2][0] + ' | ' + board[2][1] + ' | ' + board[2][2])
+
+        print('   |   |')
 
 
 class Qubit:
@@ -133,12 +153,8 @@ class Qubit:
 # Some function calls
 Board = Board()
 Board.move((0, 0), 2)
-Board.move((0, 1), 1)
-Board.swap((0, 0), (0, 1))
-# Board.check_win()
-Board.entangle((0, 1), (0, 0))
-Board.entangle((0, 0), (1, 2))
-Board.entangle((1, 2), (1, 1))
+Board.measure((0, 0))
 Board.measure((0, 1))
+Board.measure((2, 2))
 
 Board.show_board()
