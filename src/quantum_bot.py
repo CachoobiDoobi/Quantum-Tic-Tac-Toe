@@ -129,7 +129,7 @@ def win_condition(out, ancilla_start):
     return result
 
 
-def diffuser(board_len, out, ancilla_start):
+def diffuser(out, ancilla_start):
     """ Generate the diffuser sub-circuit
     
     Time complexity: O(n) with n = board_len
@@ -170,4 +170,6 @@ def generate_qasm():
     # TODO: Calculate the actual amount of qubits used
     qasm = f"version 1.0\n\nqubits {26}\n\n" + qasm
 
-print(generate_qasm(board_state))
+    return qasm
+
+print(generate_qasm())
