@@ -144,9 +144,9 @@ class QuantumState:
         })
 
     def __move(self, q, player_id):
-        angle = -np.pi / 2
+        angle = -np.pi / 4
         if player_id == 1:
-            angle = np.pi / 2
+            angle = np.pi / 4
         
         return f"Ry q[{q}], {angle:.10f}"
 
