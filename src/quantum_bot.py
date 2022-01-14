@@ -3,6 +3,7 @@ import numpy as np
 
 from quantuminspire.api import QuantumInspireAPI
 from quantuminspire.credentials import get_authentication
+from quantum_state import QuantumState
 
 QI_URL = os.getenv("API_URL", "https://api.quantum-inspire.com/")
 
@@ -206,3 +207,66 @@ class QuantumBot:
         qasm = f"version 1.0\n\nqubits {17}\n\n" + qasm
 
         return qasm
+    
+    def center_move(self):
+        """  Check if the central square is free, and then take it if it is, otherwise take corners, if those are taken take a random free square """
+        board = []
+        for x in self.board_state:
+            if x != _:
+                board.append(1)
+            else:
+                board.append(0)
+
+        qasm=""
+        qasm += f"version 1.0\n\nqubits {15}\n\n"
+        
+        qasm += f"""\n{{ {' | '.join([f"Ry q[{i}], {np.pi * board[i]}" for i in range(self.board_len)])}}}\n\n"""
+        qasm += """X q[14]\n"""
+
+        # Encode q[4] in q[9]
+        qasm += """CNOT q[4], q[9]\n"""
+        # Invert q[9]. If the center qubit was 0, q[9] is now 1 and vice-versa
+        qasm += """X q[9]\n"""
+        # If q[4] was 0 (empty), then q[9] is now 1 and the CNOT transforms q[4] into a 1 --> move is made
+        qasm += """CNOT q[9], q[4]\n"""
+        qasm += """Toffoli q[9], q[4], q[14]\n"""
+
+        #If move was made, q[9] is 1, otherwise it is 0
+        qasm += """CNOT q[0], q[10]\n"""
+        qasm += """X q[10]\n"""
+        qasm += """Toffoli q[14], q[10], q[0]\n"""
+        qasm += """Toffoli q[10], q[0], q[14]\n"""
+
+        #If move was made, q[10] = 1
+        qasm += """CNOT q[2], q[11]\n"""
+        qasm += """X q[11]\n"""
+        qasm += """Toffoli q[14], q[11], q[2]\n""" 
+        qasm += """Toffoli q[11], q[2], q[14]\n"""
+
+        #If move was made, q[11] = 1
+        qasm += """CNOT q[6], q[12]\n"""
+        qasm += """X q[12]\n"""
+        qasm += """Toffoli q[14], q[12], q[6]\n""" 
+        qasm += """Toffoli q[12], q[6], q[14]\n"""
+
+        #If move was made, q[12] = 1
+        qasm += """CNOT q[8], q[13]\n"""
+        qasm += """X q[13]\n"""
+        qasm += """Toffoli q[14], q[13], q[8]\n""" 
+        qasm += """Toffoli q[13], q[8], q[14]\n"""
+
+        #need to add case for corner and center filled
+        
+        result = qi_api.execute_qasm(qasm=qasm, backend_type=qi_backend, number_of_shots=128, full_state_projection=True)
+
+        print(result["histogram"].values())
+        print(result)
+        print(f"\nIn QASM Code\n\n{qasm}")
+        
+        
+if __name__ == "__main__":        
+    QuantumBot = QuantumBot()
+    QuantumBot.board_state =[1, 0, 1,
+                            0, 0, 0,
+                            1, 0 ,1]
+    QuantumBot.center_move()
