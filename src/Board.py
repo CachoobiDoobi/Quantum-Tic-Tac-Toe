@@ -66,11 +66,14 @@ class Board:
         return self.get_qubit(position).entagled
 
     def swap(self, position1, position2):
-        temp = self.get_qubit(position1)
+        q1 = self.get_qubit(position1)
+        q2 = self.get_qubit(position2)
         self.squares[position1[0], position1[1]] = self.get_qubit(position2)
         self.squares[position1[0], position1[1]].position = position2
-        self.squares[position2[0], position2[1]] = temp
+        q1.position = position2
+        self.squares[position2[0], position2[1]] = q1
         self.squares[position2[0], position2[1]].position = position1
+        q2.position = position1
 
         self.qs.swap(position1[0] * 3 + position1[1], position2[0] * 3 + position2[1])
 
@@ -151,10 +154,14 @@ class Qubit:
 
 
 # Some function calls
-# Board = Board()
-# Board.move((0, 0), 2)
-# Board.measure((0, 0))
-# Board.measure((0, 1))
-# Board.measure((2, 2))
-
-# Board.show_board()
+Board = Board()
+Board.move((0, 0), 2)
+Board.move((2, 2), 1)
+print(Board.squares[0, 0].position)
+print(Board.squares[2, 2].position)
+Board.swap((0, 0), (2, 2))
+print(Board.squares[0, 0].position)
+print(Board.squares[2, 2].position)
+Board.show_board()
+Board.measure((0, 0))
+Board.show_board()
