@@ -103,7 +103,7 @@ class Board:
         for qubit in to_measure:
             idx = qubit.position[0] * 3 + qubit.position[1]
             if result[idx] == 1:
-                self.squares[qubit.position[0], qubit.position[1]] = "0"
+                self.squares[qubit.position[0], qubit.position[1]] = "O"
             elif result[idx] == 0:
                 self.squares[qubit.position[0], qubit.position[1]] = "X"
 
@@ -151,10 +151,10 @@ class Qubit:
 
 
 # Some function calls
-Board = Board()
-Board.move((0, 0), 2)
-Board.measure((0, 0))
-Board.measure((0, 1))
-Board.measure((2, 2))
+# Board = Board()
+# Board.move((0, 0), 2)
+# Board.measure((0, 0))
+# Board.measure((0, 1))
+# Board.measure((2, 2))
 
-Board.show_board()
+# Board.show_board()
