@@ -221,22 +221,22 @@ MDBoxLayout:
 
 
         MDScreen:
-        name: "rules"
-        MDBoxLayout: 
-            orientation: "vertical"
-            rows: 3
+            name: "rules"
+            MDBoxLayout: 
+                orientation: "vertical"
+                rows: 3
 
-            Button:
-                id: start
-                text: "Start"
-                font_size: "45sp"
-                on_release: manager.current = "game"
+                Button:
+                    id: start
+                    text: "Start"
+                    font_size: "45sp"
+                    on_release: manager.current = "game"
 
-            MDRaisedButton:
-                id: restart
-                text: "Back to main menu"
-                pos_hint: {"center_x": .5, "center_y": .15}
-                on_release: manager.current = "menu"
+                MDRaisedButton:
+                    id: restart
+                    text: "Back to main menu"
+                    pos_hint: {"center_x": .5, "center_y": .15}
+                    on_release: manager.current = "menu"
 
 
 
