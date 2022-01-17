@@ -207,8 +207,8 @@ class QuantumBot:
         qasm = f"version 1.0\n\nqubits {17}\n\n" + qasm
 
         return qasm
-    
-    def center_move(self):
+
+    def generate_non_winning_move(self):
         """  Check if the central square is free, and then take it if it is, otherwise take corners, if those are taken take a random free square """
         board = []
         for x in self.board_state:
@@ -217,9 +217,9 @@ class QuantumBot:
             else:
                 board.append(0)
 
-        qasm=""
-        qasm += f"version 1.0\n\nqubits {15}\n\n"
-        
+        qasm = ""
+        qasm += f"version 1.0\n\nqubits {21}\n\n"
+
         qasm += f"""\n{{ {' | '.join([f"Ry q[{i}], {np.pi * board[i]}" for i in range(self.board_len)])}}}\n\n"""
         qasm += """X q[14]\n"""
 
@@ -231,42 +231,167 @@ class QuantumBot:
         qasm += """CNOT q[9], q[4]\n"""
         qasm += """Toffoli q[9], q[4], q[14]\n"""
 
-        #If move was made, q[9] is 1, otherwise it is 0
+        # If move was made, q[9] is 1, otherwise it is 0
         qasm += """CNOT q[0], q[10]\n"""
         qasm += """X q[10]\n"""
         qasm += """Toffoli q[14], q[10], q[0]\n"""
         qasm += """Toffoli q[10], q[0], q[14]\n"""
 
-        #If move was made, q[10] = 1
+        # If move was made, q[10] = 1
         qasm += """CNOT q[2], q[11]\n"""
         qasm += """X q[11]\n"""
-        qasm += """Toffoli q[14], q[11], q[2]\n""" 
+        qasm += """Toffoli q[14], q[11], q[2]\n"""
         qasm += """Toffoli q[11], q[2], q[14]\n"""
 
-        #If move was made, q[11] = 1
+        # If move was made, q[11] = 1
         qasm += """CNOT q[6], q[12]\n"""
         qasm += """X q[12]\n"""
-        qasm += """Toffoli q[14], q[12], q[6]\n""" 
+        qasm += """Toffoli q[14], q[12], q[6]\n"""
         qasm += """Toffoli q[12], q[6], q[14]\n"""
 
-        #If move was made, q[12] = 1
+        # If move was made, q[12] = 1
         qasm += """CNOT q[8], q[13]\n"""
         qasm += """X q[13]\n"""
-        qasm += """Toffoli q[14], q[13], q[8]\n""" 
+        qasm += """Toffoli q[14], q[13], q[8]\n"""
         qasm += """Toffoli q[13], q[8], q[14]\n"""
 
-        #need to add case for corner and center filled
-        
-        result = qi_api.execute_qasm(qasm=qasm, backend_type=qi_backend, number_of_shots=128, full_state_projection=True)
+        # need to add case for corner and center filled
+        qasm += """H q[9,10]\n"""
+        qasm += """Measure_z q[9,10]\n"""
+
+        # ============ Random move ========================
+
+        # UP, q15 ununcomputable
+        # check combination q9 q10 (0,0)
+        qasm += """.logicup(1)\n"""
+        qasm += """X q[9,10]\n"""
+        qasm += """Toffoli q[9], q[10], q[15]\n"""
+        # if valid, check if q1 is 1, if q1 is 1, flip q10
+        qasm += """Toffoli q[15], q[1], q[10]\n"""
+        # check if combination is still valid
+        qasm += """Toffoli q[9], q[10], q[20]\n"""
+        # if combination still valid, flip q1
+        qasm += """Toffoli q[20], q[14], q[1]\n"""
+
+        qasm += """Toffoli q[1], q[20], q[14]\n"""
+        qasm += """Toffoli q[9], q[10], q[20]\n"""
+        qasm += """X q[9,10]\n"""
+
+        # LEFT, q16 ununcomputable
+
+        # check combination q9 q10 (0,1)
+        qasm += """X q[9]\n"""
+        qasm += """Toffoli q[9], q[10], q[16]\n"""
+        # if valid, check if q3 is 1, if q3 is 1, flip q9
+        qasm += """Toffoli q[16], q[3], q[9]\n"""
+
+        # check if combination is still valid
+        qasm += """Toffoli q[9], q[10], q[20]\n"""
+        # if combination still valid, flip q3
+        qasm += """ Toffoli q[20], q[14], q[3]\n"""
+        qasm += """ .uncomputeleft(1)\n"""
+        qasm += """Toffoli q[3], q[20], q[14]\n """
+        qasm += """Toffoli q[9], q[10], q[20]\n """
+        qasm += """X q[9] """
+        # right, q17 ununcomputable
+
+        qasm += """.logicright(1)\n"""
+        # check combination q9 q10 (1,1)
+
+        qasm += """ Toffoli q[9], q[10], q[17] \n"""
+        # if valid, check if q5 is 1, if q5 is 1, flip q10
+
+        qasm += """ Toffoli q[17], q[5], q[10]\n"""
+        # check if combination is still valid
+        qasm += """ Toffoli q[9], q[10], q[20]\n"""
+        # if combination still valid, flip q5
+        qasm += """  Toffoli q[20], q[14], q[5]\n"""
+        qasm += """ .uncomputeright(1)\n"""
+        qasm += """  Toffoli q[5], q[20], q[14]\n"""
+        qasm += """Toffoli q[9], q[10], q[20]\n """
+        # DOWN, q18 ununcomputable
+
+        qasm += """.logicdown(1)\n"""
+        # check combination q9 q10 (1,0)
+        qasm += """X q[10] \n"""
+        qasm += """Toffoli q[9], q[10], q[18] \n"""
+        # if valid, check if q3 is 1, if q3 is 1, flip q9
+
+        qasm += """ Toffoli q[18], q[7], q[9]\n"""
+        # check if combination is still valid
+
+        qasm += """ Toffoli q[9], q[10], q[20]\n"""
+        # if combination still valid, flip q3
+        qasm += """  Toffoli q[20], q[14], q[7]\n"""
+        qasm += """.uncomputedown(1)\n """
+        qasm += """Toffoli q[7], q[20], q[14]\n """
+        qasm += """Toffoli q[9], q[10], q[20]\n """
+        qasm += """ X q[10]\n """
+        # ==== In the worst case, we need the first three circuits again ====
+
+        # UP, q15 ununcomputable
+        qasm += """ .logicUP(1)\n"""
+        # check combination q9 q10 (0,0)
+        qasm += """  X q[9,10] \n"""
+        qasm += """ Toffoli q[9], q[10], q[15]\n"""
+        # if valid, check if q1 is 1, if q1 is 1, flip q10
+        qasm += """ Toffoli q[15], q[1], q[10]\n"""
+        # check if combination is still valid
+        qasm += """Toffoli q[9], q[10], q[20]\n """
+        # if combination still valid, flip q1
+        qasm += """ Toffoli q[20], q[14], q[1]\n"""
+        qasm += """ .uncomputeUP(1)\n"""
+        qasm += """Toffoli q[1], q[20], q[14]\n"""
+        qasm += """ Toffoli q[9], q[10], q[20]\n"""
+        qasm += """ X q[9,10]\n """
+
+        # LEFT, q16 ununcomputable
+        qasm += """ .logicleft(1)\n"""
+        # check combination q9 q10 (0,1)
+        qasm += """   X q[9]\n"""
+        qasm += """ Toffoli q[9], q[10], q[16]\n"""
+        # if valid, check if q3 is 1, if q3 is 1, flip q9
+
+        qasm += """Toffoli q[16], q[3], q[9]\n """
+        # check if combination is still valid
+
+        qasm += """ Toffoli q[9], q[10], q[20]\n"""
+        # if combination still valid, flip q3
+
+        qasm += """ Toffoli q[20], q[14], q[3] \n"""
+
+        qasm += """ .uncomputeleft(1)\n"""
+        qasm += """Toffoli q[3], q[20], q[14]\n"""
+        qasm += """ Toffoli q[9], q[10], q[20]\n"""
+        qasm += """X q[9]\n"""
+        # right, q17 ununcomputable
+        qasm += """.logicright(1)\n"""
+        # check combination q9 q10 (1,1)
+        qasm += """Toffoli q[9], q[10], q[17]\n"""
+        # if valid, check if q5 is 1, if q5 is 1, flip q10
+        qasm += """Toffoli q[17], q[5], q[10]\n"""
+        # check if combination is still valid
+        qasm += """Toffoli q[9], q[10], q[20]\n"""
+        # if combination still valid, flip q5
+        qasm += """Toffoli q[20], q[14], q[5]\n"""
+
+        qasm += """.uncomputeright(1)\n"""
+        qasm += """Toffoli q[5], q[20], q[14]\n"""
+        qasm += """Toffoli q[9], q[10], q[20]\n"""
+
+        result = qi_api.execute_qasm(qasm=qasm, backend_type=qi_backend, number_of_shots=128,
+                                     full_state_projection=True)
 
         print(result["histogram"].values())
-        print(result)
-        print(f"\nIn QASM Code\n\n{qasm}")
-        
+        # print(result)
+        # print(f"\nIn QASM Code\n\n{qasm}")
+        return result["histogram"].keys()
+
+
         
 if __name__ == "__main__":        
     QuantumBot = QuantumBot()
     QuantumBot.board_state =[1, 0, 1,
                             0, 0, 0,
                             1, 0 ,1]
-    QuantumBot.center_move()
+    QuantumBot.generate_non_winning_move()
