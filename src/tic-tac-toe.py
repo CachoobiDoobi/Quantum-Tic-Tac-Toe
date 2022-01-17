@@ -1,5 +1,6 @@
 # Tic Tac Toe
 import random
+from quantum_bot import QuantumBot, _, X, O
 
 
 def drawBoard(board):
@@ -57,11 +58,11 @@ def whoGoesFirst():
 
    # if random.randint(0, 1) == 0:
 
-        return 'computer'
+      # return 'computer'
 
    # else:
 
-      #  return 'player'
+        return 'player'
 
 
 def playAgain():
@@ -160,51 +161,9 @@ def getComputerMove(board, computerLetter):
 
         playerLetter = 'X'
 
-    # Here is our algorithm for our Tic Tac Toe AI:
-
-    # First, check if we can win in the next move
-
-    for i in range(1, 10):
-
-        copy = getBoardCopy(board)
-
-        if isSpaceFree(copy, i):
-
-            makeMove(copy, computerLetter, i)
-
-            if isWinner(copy, computerLetter):
-                return i
-
-    # Check if the player could win on their next move, and block them.
-
-    for i in range(1, 10):
-
-        copy = getBoardCopy(board)
-
-        if isSpaceFree(copy, i):
-
-            makeMove(copy, playerLetter, i)
-
-            if isWinner(copy, playerLetter):
-                return i
-
-
-    # Try to take the center, if it is free.
-
-    if isSpaceFree(board, 5):
-        return 5
-
-    # Try to take one of the corners, if they are free.
-    move = chooseRandomMoveFromList(board, [1, 3, 7, 9])
-
-    if move != None:
-        return move
-
-
-
-    # Move on one of the sides.
-
-    return chooseRandomMoveFromList(board, [2, 4, 6, 8])
+    board_state = [ X if value == computerLetter else O if value == playerLetter else _ for value in board[1:]]
+    quantumBot = QuantumBot()
+    return quantumBot.find_next_move(board_state) + 1 # This board is 1 indexed
 
 
 def isBoardFull(board):
@@ -271,6 +230,8 @@ while True:
         else:
 
             # Computer’s turn.
+
+            drawBoard(theBoard)
 
             move = getComputerMove(theBoard, computerLetter)
 

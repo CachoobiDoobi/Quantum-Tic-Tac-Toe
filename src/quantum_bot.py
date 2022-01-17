@@ -1,6 +1,8 @@
 import os
 import numpy as np
 
+from math import log2
+
 from quantuminspire.api import QuantumInspireAPI
 from quantuminspire.credentials import get_authentication
 from quantum_state import QuantumState
@@ -47,7 +49,7 @@ def execute_qasm(qasm, backend_type, number_of_shots=128, full_state_projection=
             [f"{str(index + 1).rjust(log10_linecount, ' ')} |  {line}" for index, line in enumerate(lines)])
         print(f"\nIn QASM Code\n\n{qasm}")
 
-    return result["historgram"]
+    return result["histogram"]
 
 
 def reverse_lines(str):
@@ -102,14 +104,30 @@ class QuantumBot:
             print("Invalid board state was given")
             return
 
+        win_threshold = 0.4
         self.board_state = board_state
 
-        # Use the code from self.generate_winning_move_qasm
-        # TODO: Add all steps
+        # Check if we can win
+        results = self.generate_winning_move()
+        best_move = max(zip(results.values(), results.keys()))
+        if best_move[0] > win_threshold:
+            return int(log2(int(best_move[1])))
 
-        # execute_qasm(self.generate_winning_move_qasm(), qi_backend)
+        # Check if the opponent can win, block them
+        self.board_state = [X if value == O else O if value == X else _ for value in board_state]
+        results = self.generate_winning_move()
+        best_move = max(zip(results.values(), results.keys()))
+        if best_move[0] > win_threshold:
+            return int(log2(int(best_move[1])))
 
-        # return a number or a board state?
+        board_mask = int("".join("0" if value == _ else "1" for value in board_state[::-1]), 2)
+        results = self.generate_non_winning_move()
+
+        best_move = int(list(results.keys())[0])
+        best_move &= 2 ** 9 - 1 # We only need the lowest 9 bits
+        best_move ^= board_mask # Xor the old board state away
+
+        return int(log2(best_move))
 
 
     def move_validation(self, out, ancilla_start):
@@ -180,7 +198,7 @@ class QuantumBot:
         return result
 
 
-    def generate_winning_move_qasm(self):
+    def generate_winning_move(self):
         """ Generate the qasm code for the winning move algorithm given the current board state
 
         Time complexity: O(27n)
@@ -194,19 +212,24 @@ class QuantumBot:
         qasm = ""
         qasm += f"h q[0:{self.board_len}]\nz q[{self.board_len}]\n"
 
+        variable_cells = [str(index) for index, value in enumerate(self.board_state) if value == _] # O(n)
         # TODO: Get an appropriate number by calculations or heuristics
-        qasm += "\n.grover(8)\n"
+        qasm += f"\n.grover({len(variable_cells)})\n"
         qasm += valid_and_win + grovers_bit + reverse_lines(valid_and_win) + "\n" # O(13n)
         qasm += self.winning_move_diffuser(self.board_len, self.board_len + 1) # O(n)
 
         # Not measuring is faster, but then the results will have to be filtered afterwards
-        qasm += f"\n.measurement\nmeasure_z q[{', '.join([str(index) for index, value in enumerate(self.board_state) if value == _])}]" # O(n)
+        qasm += f"\n.measurement\nmeasure_z q[{', '.join(variable_cells)}]"
 
         # This circuit will always use 17 qubits for a 3x3 board with at least 1 filled square
         # This limit is mostly defined by the multi-controlled toffoli for the diffuser
         qasm = f"version 1.0\n\nqubits {17}\n\n" + qasm
 
-        return qasm
+        result = execute_qasm(qasm=qasm, backend_type=qi_backend, number_of_shots=32,
+                                     full_state_projection=False)
+
+        return result
+
 
     def generate_non_winning_move(self):
         """  Check if the central square is free, and then take it if it is, otherwise take corners, if those are taken take a random free square """
@@ -379,19 +402,19 @@ class QuantumBot:
         qasm += """Toffoli q[5], q[20], q[14]\n"""
         qasm += """Toffoli q[9], q[10], q[20]\n"""
 
-        result = qi_api.execute_qasm(qasm=qasm, backend_type=qi_backend, number_of_shots=128,
+        result = execute_qasm(qasm=qasm, backend_type=qi_backend, number_of_shots=128,
                                      full_state_projection=True)
 
-        print(result["histogram"].values())
-        # print(result)
-        # print(f"\nIn QASM Code\n\n{qasm}")
-        return result["histogram"].keys()
+        return result
 
 
         
 if __name__ == "__main__":        
     QuantumBot = QuantumBot()
-    QuantumBot.board_state =[1, 0, 1,
-                            0, 0, 0,
-                            1, 0 ,1]
-    QuantumBot.generate_non_winning_move()
+    QuantumBot.board_state =[
+        O, _, X,
+        _, _, O,
+        X, O, _
+    ]
+    result = QuantumBot.generate_non_winning_move()
+    print(result)
