@@ -163,7 +163,7 @@ def getComputerMove(board, computerLetter):
 
     board_state = [ X if value == computerLetter else O if value == playerLetter else _ for value in board[1:]]
     quantumBot = QuantumBot()
-    return quantumBot.find_next_move(board_state) + 1 # This board is 1 indexed
+    return quantumBot.find_next_move(board_state, turn_number) + 1 # This board is 1 indexed
 
 
 def isBoardFull(board):
@@ -183,6 +183,7 @@ while True:
 
     # Reset the board
 
+    turn_number = 0
     theBoard = [' '] * 10
 
     playerLetter, computerLetter = inputPlayerLetter()
@@ -196,6 +197,7 @@ while True:
     while gameIsPlaying:
 
         if turn == 'player':
+            turn_number += 1
 
             # Player’s turn.
 

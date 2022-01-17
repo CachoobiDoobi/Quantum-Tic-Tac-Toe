@@ -99,7 +99,13 @@ class QuantumBot:
         self.win_conditions = WINS_3x3
     
 
-    def find_next_move(self, board_state):
+    def find_next_move(self, board_state, turn_number=9):
+        """ Returns the best move for the AI to make
+
+        Args:
+            board_state: The state of the board
+            turn_number (int): Turn counter starting from 1
+        """
         if len(board_state) != self.board_len:
             print("Invalid board state was given")
             return
@@ -107,18 +113,20 @@ class QuantumBot:
         win_threshold = 0.4
         self.board_state = board_state
 
-        # Check if we can win
-        results = self.generate_winning_move()
-        best_move = max(zip(results.values(), results.keys()))
-        if best_move[0] > win_threshold:
-            return int(log2(int(best_move[1])))
+        if turn_number >= 3:
+            # Check if we can win
+            results = self.generate_winning_move()
+            best_move = max(zip(results.values(), results.keys()))
+            if best_move[0] > win_threshold:
+                return int(log2(int(best_move[1])))
 
-        # Check if the opponent can win, block them
-        self.board_state = [X if value == O else O if value == X else _ for value in board_state]
-        results = self.generate_winning_move()
-        best_move = max(zip(results.values(), results.keys()))
-        if best_move[0] > win_threshold:
-            return int(log2(int(best_move[1])))
+        if turn_number >= 2:
+            # Check if the opponent can win, block them
+            self.board_state = [X if value == O else O if value == X else _ for value in board_state]
+            results = self.generate_winning_move()
+            best_move = max(zip(results.values(), results.keys()))
+            if best_move[0] > win_threshold:
+                return int(log2(int(best_move[1])))
 
         board_mask = int("".join("0" if value == _ else "1" for value in board_state[::-1]), 2)
         results = self.generate_non_winning_move()
