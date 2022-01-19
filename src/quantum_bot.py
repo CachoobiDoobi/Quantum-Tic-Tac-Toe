@@ -120,7 +120,6 @@ class QuantumBot:
             if best_move[0] > win_threshold:
                 return int(log2(int(best_move[1])))
 
-        if turn_number >= 2:
             # Check if the opponent can win, block them
             self.board_state = [X if value == O else O if value == X else _ for value in board_state]
             results = self.generate_winning_move()
@@ -323,7 +322,7 @@ class QuantumBot:
         qasm += """ .uncomputeleft(1)\n"""
         qasm += """Toffoli q[3], q[20], q[14]\n """
         qasm += """Toffoli q[9], q[10], q[20]\n """
-        qasm += """X q[9] """
+        qasm += """X q[9]\n"""
         # right, q17 ununcomputable
 
         qasm += """.logicright(1)\n"""
