@@ -239,6 +239,7 @@ class TicTacToe(MDApp):
         self.root.ids.score.text = "X's turn"
         self.root.ids.moves.text = "20 moves left"
         self.root.ids.computer_score.text = "Player vs Quantum computer"
+        self.root.ids.swap.text = "Swap (2)"
         self.cboard = [_, _, _, _, _, _, _, _, _]
         self.turn = 1
         self.player = 1
