@@ -213,7 +213,7 @@ class TicTacToe(MDApp):
         queue = set({qubit})
         result = set({qubit})
 
-        while len(queue) is not 0:
+        while len(queue) != 0:
             q = queue.pop()
             for qubit in q.entangled:
                 if qubit not in result:
@@ -252,7 +252,7 @@ class TicTacToe(MDApp):
 
     def set_text(self, button, probabilities):
         # switch for displaying the right symbol
-        if len(probabilities) is 5:
+        if len(probabilities) == 5:
             button.text = "f"
 
         elif 1 in probabilities:

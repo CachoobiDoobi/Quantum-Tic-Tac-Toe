@@ -75,13 +75,12 @@ class Board:
     def swap(self, position1, position2):
         q1 = self.get_qubit(position1)
         q2 = self.get_qubit(position2)
-        self.squares[position1[0], position1[1]] = self.get_qubit(position2)
+        self.squares[position1[0], position1[1]] = q2
         self.squares[position1[0], position1[1]].position = position2
-        q1.position = position2
         self.squares[position2[0], position2[1]] = q1
         self.squares[position2[0], position2[1]].position = position1
         q2.position = position1
-
+        q1.position = position2
         self.qs.swap(position1[0] * 3 + position1[1], position2[0] * 3 + position2[1])
 
     def entangle(self, position1, position2):
@@ -115,9 +114,9 @@ class Board:
         for qubit in to_measure:
             idx = qubit.position[0] * 3 + qubit.position[1]
             if result[idx] == 1:
-                self.squares[qubit.position[0], qubit.position[1]] = "O"
-            elif result[idx] == 0:
                 self.squares[qubit.position[0], qubit.position[1]] = "X"
+            elif result[idx] == 0:
+                self.squares[qubit.position[0], qubit.position[1]] = "O"
 
     def show_board(self):
         board = [[], [], []]
@@ -171,6 +170,6 @@ class Qubit:
 # Board.swap((0, 0), (2, 2))
 # print(Board.squares[0, 0].position)
 # print(Board.squares[2, 2].position)
-# Board.show_board()
-# Board.measure((0, 0))
+# #Board.show_board()
+# #Board.measure((0, 0))
 # Board.show_board()
