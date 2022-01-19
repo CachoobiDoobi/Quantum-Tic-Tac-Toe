@@ -115,9 +115,9 @@ class Board:
         for qubit in to_measure:
             idx = qubit.position[0] * 3 + qubit.position[1]
             if result[idx] == 1:
-                self.squares[qubit.position[0], qubit.position[1]] = "O"
-            elif result[idx] == 0:
                 self.squares[qubit.position[0], qubit.position[1]] = "X"
+            elif result[idx] == 0:
+                self.squares[qubit.position[0], qubit.position[1]] = "O"
 
     def show_board(self):
         board = [[], [], []]
