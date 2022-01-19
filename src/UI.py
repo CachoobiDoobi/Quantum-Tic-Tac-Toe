@@ -165,32 +165,36 @@ class TicTacToe(MDApp):
     def cexcecute(self, btn, row, col):
         if not self.check_win(self.cboard):
             # player move
-            btn.text = "X"
+            btn.text = "O"
             btn.disabled = True
-            self.cboard[row + col *3] = X
+            self.cboard[row + col *3] = O
 
-            if not self.check_win(self.cboard) and _ in self.cboard: 
+            if not self.check_win(self.cboard): 
                 # quantum computer move
-                move = self.bot.find_next_move([X if value == O else O if value == X else _ for value in self.cboard], self.turn)
-                self.root.ids.computer_grid.children[::-1][move].text = "O"
-                self.root.ids.computer_grid.children[::-1][move].disabled = "True"
-                self.cboard[move] = O
-                print("board positions: ", self.cboard)
-                print("computer move: ", move)
-                self.turn += 1
+                self.ai_move()
 
                 if self.check_win(self.cboard):
                     self.root.ids.computer_score.text = "Computer has won"
-            else:
-                if _ not in self.cboard:
+                elif _ not in self.cboard:
                     self.root.ids.computer_score.text = "Tie"
-                else:
-                    self.root.ids.computer_score.text = "Player has won"
+            else:
+                self.root.ids.computer_score.text = "Player has won"
 
         if self.check_win(self.cboard):
             for button in self.root.ids.computer_grid.children:
                 button.disabled = True
-            
+    
+
+
+    def ai_move(self):
+        move = self.bot.find_next_move(self.cboard, self.turn)
+        self.root.ids.computer_grid.children[::-1][move].text = "X"
+        self.root.ids.computer_grid.children[::-1][move].disabled = True
+        self.cboard[move] = X
+        print("board positions: ", self.cboard)
+        print("computer move: ", move)
+        self.turn += 1
+
 
         
     def check_win(self, board):
@@ -340,6 +344,7 @@ class TicTacToe(MDApp):
     def start(self):
         if self.computer:
             self.root.ids.manager.current = "computer"
+            self.ai_move()
         else:
             self.root.ids.manager.current = "game"
 
