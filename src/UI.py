@@ -1,11 +1,6 @@
-from random import random
-from tkinter import DISABLED
 from kivy.lang import Builder
-from kivy.core.window import Window
 from kivymd.app import MDApp
-from kivy.clock import Clock
-from numpy import isin
-from Board import Board
+from Board import Board, Qubit
 from quantum_bot import _, X, O, QuantumBot
 
 
@@ -81,14 +76,32 @@ class TicTacToe(MDApp):
             self.player = 1
 
         self.root.ids.swap.text = "Swap (" + str(self.swap_left[self.player-1]) + ")"
-
-
         self.moves -= 1
         self.root.ids.moves.text = str(self.moves) + " moves left"
-        if self.moves < 1:
+
+        # check win
+        if len(self.board.check_win()) == 1:
+            self.root.ids.score.text = self.board.check_win().pop() + " wins!"
+            for button in self.root.ids.grid.children:
+                button.disabled = True
+        elif self.moves < 1:
+            # collapse if there are no moves left
+            qubits = set()
+            first = None
             for i in range(3): 
                 for j in range(3):
-                    if not isinstance(self.board.squares[i, j], str): self.board.measure((i, j))
+                    if not isinstance(self.board.squares[i, j], str):
+                        if first is None: first = (i, j)
+                        qubits.add(self.board.squares[i, j])
+            self.board.measure(first, qubits)
+            
+
+
+            win = self.board.check_win()
+            if ("O" in win and "X" in win) or len(win) is 0:
+                self.root.ids.score.text = "It's a tie"
+            else:
+                self.root.ids.score.text = win.pop() + " wins!"
         
 
         # array for usable colors
@@ -143,11 +156,8 @@ class TicTacToe(MDApp):
                     probabilities = set()
                     for q in entangled: probabilities.add(q.probability)
                     self.set_text(button, probabilities)
-                    
-
-        # check win
-        # TODO: win screen
-        self.board.check_win()
+        
+        
         self.first_qubit = None
 
 
@@ -158,26 +168,29 @@ class TicTacToe(MDApp):
             btn.text = "X"
             btn.disabled = True
             self.cboard[row + col *3] = X
-            self.turn += 1
 
-            if not self.check_win(self.cboard) and self.turn < 9: 
+            if not self.check_win(self.cboard) and _ in self.cboard: 
                 # quantum computer move
-                move = self.bot.find_next_move(self.cboard, self.turn)
+                move = self.bot.find_next_move([X if value == O else O if value == X else _ for value in self.cboard], self.turn)
                 self.root.ids.computer_grid.children[::-1][move].text = "O"
                 self.root.ids.computer_grid.children[::-1][move].disabled = "True"
                 self.cboard[move] = O
                 print("board positions: ", self.cboard)
                 print("computer move: ", move)
                 self.turn += 1
+
+                if self.check_win(self.cboard):
+                    self.root.ids.computer_score.text = "Computer has won"
             else:
-                self.root.ids.computer_score.text = "Player has won"
-        else:
-            self.root.ids.computer_score.text = "Computer has won"
+                if _ not in self.cboard:
+                    self.root.ids.computer_score.text = "Tie"
+                else:
+                    self.root.ids.computer_score.text = "Player has won"
 
-        if self.turn > 9:
-            self.root.ids.computer_score.text = "Tie"
-
-
+        if self.check_win(self.cboard):
+            for button in self.root.ids.computer_grid.children:
+                button.disabled = True
+            
 
         
     def check_win(self, board):
@@ -185,7 +198,7 @@ class TicTacToe(MDApp):
             if board[3*row] is board[3*row+1] and board[3*row+1] is board[3*row+2] and board[3*row] is not _: return True
 
         for column in range(3):
-            if board[row] is board[row+3] and board[row+3] is board[row+6] and board[row] is not _: return True
+            if board[column] is board[column+3] and board[column+3] is board[column+6] and board[column] is not _: return True
 
         if board[0] is board[4] and board[4] is board[8] and board[0] is not _: return True
         if board[2] is board[4] and board[4] is board[6] and board[2] is not _: return True
@@ -229,6 +242,8 @@ class TicTacToe(MDApp):
         self.cboard = [_, _, _, _, _, _, _, _, _]
         self.turn = 1
         self.player = 1
+        self.moves = 20
+        self.swap_left = [2,2]
         self.board = Board()
         self.root.ids.manager.current = "menu"
 
