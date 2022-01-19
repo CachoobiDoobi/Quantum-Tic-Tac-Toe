@@ -4,32 +4,42 @@ from kivy.lang import Builder
 from kivy.core.window import Window
 from kivymd.app import MDApp
 from kivy.clock import Clock
+from numpy import isin
 from Board import Board
+from quantum_bot import _, X, O, QuantumBot
+
 
 from kivy.core.text import LabelBase
 
 class TicTacToe(MDApp):
     def build(self):
+        # setup theme colors
         self.theme_cls.theme_style = "Dark"
         self.theme_cls.primary_palette = "Blue"
         self.theme_cls.primary_hue = "600"
-        # Window.borderless = True
-
-        self.board = Board()
-        self.Computer = False
 
         return Builder.load_file("./UI/UI.kv")
 
-    # player 1 is 'X', player 2 is 'O'
-    player = 1
 
+
+    # global values
+    player = 1
     action = "normal"
     first_qubit = None
+    board = Board()
+    moves = 20
+    swap_left = [2,2]
+
+    bot = QuantumBot()
+    cboard = [_, _, _, _, _, _, _, _, _]
+    computer = False
+    turn = 1
+    
+
 
     def excecute(self, btn, col, row):
-
+        # perform action based on global value
         if self.action == "normal":
-            
             probability = self.board.get_qubit((row, col)).probability
 
             if (self.player == 1 and probability >= 0.25) or (self.player == 2 and probability <= 0.75):
@@ -38,9 +48,10 @@ class TicTacToe(MDApp):
                 self.nextMove()
 
         elif self.action == "swap":
-            if self.first_qubit is not None:
+            if self.first_qubit is not None and self.swap_left[self.player-1] > 0:
                 self.board.swap(self.first_qubit, (row, col))
                 self.first_qubit = None
+                self.swap_left[self.player-1] -= 1
                 self.nextMove()
             else:
                 self.first_qubit = (row, col)
@@ -57,6 +68,267 @@ class TicTacToe(MDApp):
                 self.nextMove()
             else:
                 self.first_qubit = (row, col)
+
+
+
+    def nextMove(self):
+        # change the current player
+        if self.player == 1:
+            self.root.ids.score.text = "O's turn"
+            self.player = 2
+        else:
+            self.root.ids.score.text = "X's turn"
+            self.player = 1
+
+        self.root.ids.swap.text = "Swap (" + str(self.swap_left[self.player-1]) + ")"
+
+
+        self.moves -= 1
+        self.root.ids.moves.text = str(self.moves) + " moves left"
+        if self.moves < 1:
+            for i in range(3): 
+                for j in range(3):
+                    if not isinstance(self.board.squares[i, j], str): self.board.measure((i, j))
+        
+
+        # array for usable colors
+        colors = [[1, 0, 0, 1], [0, 1, 0, 1], [0, 0, 1, 1], [1, 1, 0, 1], [1, 0, 1, 1], [0, 1, 1, 1]]
+        colors_index = 0
+        qubit_colors = {}
+
+
+        # go over all the buttons with corresponding qubits
+        for button, qubit in zip(self.root.ids.grid.children[::-1], self.board.squares.flatten()):
+            if isinstance(qubit, str):
+                button.font_name = "Roboto"
+                button.text = qubit
+                button.disabled = True
+                button.text_color = [1, 1, 1, 1]
+
+            else:
+                # use the states fond and select the right symbol
+                button.font_name = "States"
+                if not qubit.entangled:
+                    if qubit.probability == 1:
+                        button.text = "A"
+                    elif qubit.probability == 0:
+                        button.text = "B"
+                    elif qubit.probability == 0.5:
+                        button.text = "C"
+                    elif qubit.probability == 0.75:
+                        button.text = "D"
+                    elif qubit.probability == 0.25:
+                        button.text = "E"
+                    button.text_color = [1, 1, 1, 1]
+
+                else:
+                    # get all the entangled qubits
+                    entangled = self.search_entangled(qubit)
+
+
+                    # setup the colors
+                    if str(qubit) in qubit_colors:
+                        button.text_color = qubit_colors[str(qubit)]
+                    else:
+                        new_color = colors[colors_index]
+                        colors_index += 1
+                        button.text_color = new_color
+                        qubit_colors[str(qubit)] = new_color
+
+                        for q in entangled:
+                            qubit_colors[str(q)] = new_color
+
+
+                    # get all the probabilities and set the state symbol
+                    probabilities = set()
+                    for q in entangled: probabilities.add(q.probability)
+                    self.set_text(button, probabilities)
+                    
+
+        # check win
+        # TODO: win screen
+        self.board.check_win()
+        self.first_qubit = None
+
+
+
+    def cexcecute(self, btn, row, col):
+        if not self.check_win(self.cboard):
+            # player move
+            btn.text = "X"
+            btn.disabled = True
+            self.cboard[row + col *3] = X
+            self.turn += 1
+
+            if not self.check_win(self.cboard) and self.turn < 9: 
+                # quantum computer move
+                move = self.bot.find_next_move(self.cboard, self.turn)
+                self.root.ids.computer_grid.children[::-1][move].text = "O"
+                self.root.ids.computer_grid.children[::-1][move].disabled = "True"
+                self.cboard[move] = O
+                print("board positions: ", self.cboard)
+                print("computer move: ", move)
+                self.turn += 1
+            else:
+                self.root.ids.computer_score.text = "Player has won"
+        else:
+            self.root.ids.computer_score.text = "Computer has won"
+
+        if self.turn > 9:
+            self.root.ids.computer_score.text = "Tie"
+
+
+
+        
+    def check_win(self, board):
+        for row in range(3):
+            if board[3*row] is board[3*row+1] and board[3*row+1] is board[3*row+2] and board[3*row] is not _: return True
+
+        for column in range(3):
+            if board[row] is board[row+3] and board[row+3] is board[row+6] and board[row] is not _: return True
+
+        if board[0] is board[4] and board[4] is board[8] and board[0] is not _: return True
+        if board[2] is board[4] and board[4] is board[6] and board[2] is not _: return True
+        
+        return False
+
+        
+
+
+    def search_entangled(self, qubit):
+        # DFS for getting all the entangled qubits
+        queue = set({qubit})
+        result = set({qubit})
+
+        while len(queue) is not 0:
+            q = queue.pop()
+            for qubit in q.entangled:
+                if qubit not in result:
+                    result.add(qubit)
+                    queue.add(qubit)
+
+        return result
+
+
+
+    def restart(self):
+        # reset all the game elements and go back to main menu
+        for button in self.root.ids.grid.children:
+            button.disabled = False
+            button.font_name = "States"
+            button.text = "C"
+            button.text_color = [1, 1, 1, 1]
+
+        for button in self.root.ids.computer_grid.children:
+            button.disabled = False
+            button.text = "_"
+
+        self.root.ids.score.text = "X's turn"
+        self.root.ids.moves.text = "20 moves left"
+        self.root.ids.computer_score.text = "Player vs Quantum computer"
+        self.cboard = [_, _, _, _, _, _, _, _, _]
+        self.turn = 1
+        self.player = 1
+        self.board = Board()
+        self.root.ids.manager.current = "menu"
+
+
+
+    def set_text(self, button, probabilities):
+        # switch for displaying the right symbol
+        if len(probabilities) is 5:
+            button.text = "f"
+
+        elif 1 in probabilities:
+            if 0.75 in probabilities:
+                if 0.5 in probabilities:
+                    if 0.25 in probabilities:
+                        button.text = "e"
+                    else:
+                        button.text = "b"
+                elif 0.25 in probabilities:
+                    if 0 in probabilities:
+                        button.text = "a"
+                    else:
+                        button.text = "W"
+                elif 0 in probabilities:
+                    button.text = "R"
+                else:
+                    button.text = "M"
+            elif 0.5 in probabilities:
+                if 0.25 in probabilities:
+                    if 0 in probabilities:
+                        button.text = "c"
+                    else:
+                        button.text = "Y"
+                elif 0 in probabilities:
+                    button.text = "Q"
+                else:
+                    button.text = "K"
+                
+            elif 0.25 in probabilities:
+                if 0 in probabilities:
+                    button.text = "S"
+                else:
+                    button.text = "I"
+            elif 0 in probabilities:
+                button.text = "F"
+            else:
+                button.text = "A"
+        
+        elif 0.75 in probabilities:
+            if 0.5 in probabilities:
+                if 0.25 in probabilities:
+                    if 0 in probabilities:
+                        button.text = "d"
+                    else:
+                        button.text = "X"
+                elif 0 in probabilities:
+                    button.text = "Z"
+                else:
+                    button.text = "O"
+            elif 0.25 in probabilities:
+                if 0 in probabilities:
+                    button.text = "V"
+                else:
+                    button.text = "G"
+            elif 0 in probabilities:
+                button.text = "J"
+            else:
+                button.text = "D"
+        
+        elif 0.5 in probabilities:
+            if 0.25 in probabilities:
+                if 0 in probabilities:
+                    button.text = "T"
+                else:
+                    button.text = "P"
+            elif 0 in probabilities:
+                button.text = "L"
+            else:
+                button.text = "H"
+
+        elif 0.25 in probabilities:
+            if 0 in probabilities:
+                button.text = "N"
+            else:
+                button.text = "E"
+        else:
+            button.text = "B"
+
+
+
+    def on_start(self, **kwargs):
+        self.restart()
+
+    def start(self):
+        if self.computer:
+            self.root.ids.manager.current = "computer"
+        else:
+            self.root.ids.manager.current = "game"
+
+    def checkbox_click(self, instance, value):
+        self.computer = value
 
     def pulse(self):
         self.action = "normal"
@@ -85,117 +357,8 @@ class TicTacToe(MDApp):
         self.root.ids.collapse.disabled = False
         self.first_qubit = None
 
-    def nextMove(self):
-        if self.player == 1:
-            self.root.ids.score.text = "O's turn"
-            self.player = 2
-        else:
-            self.root.ids.score.text = "X's turn"
-            self.player = 1
-
-        
-        # dict for entangled colors
-        qubits = {}
-
-        for button, qubit in zip(self.root.ids.grid.children[::-1], self.board.squares.flatten()):
-            if isinstance(qubit, str):
-                button.font_name = "Roboto"
-                button.text = qubit
-                button.disabled = True
-                button.text_color = [1, 1, 1, 1]
-            else:
-                
-                button.font_name = "States"
-                if qubit.probability == 1:
-                    button.text = "A"
-                elif qubit.probability == 0:
-                    button.text = "B"
-                elif qubit.probability == 0.5:
-                    button.text = "C"
-                elif qubit.probability == 0.75:
-                    button.text = "D"
-                elif qubit.probability == 0.25:
-                    button.text = "E"
-
-                button.text_color = [1, 1, 1, 1]
 
 
-                if qubit.entangled:
-
-                    if str(qubit) in qubits:
-                        button.text_color = qubits[str(qubit)]
-                    else:
-                        new_color = [random(), random(), random(), 1]
-                        button.text_color = new_color
-                        qubits[str(qubit)] = new_color
-
-                        # are we doing more than 1 entangled qubit?
-                        for entangled in qubit.entangled:
-                            qubits[str(entangled)] = new_color
-
-                    if qubit.probability == 1:
-                        if next(iter(qubit.entangled)).probability == 1: button.text = "A"
-                        if next(iter(qubit.entangled)).probability == 0: button.text = "F" 
-                        if next(iter(qubit.entangled)).probability == 0.25: button.text = "I" 
-                        if next(iter(qubit.entangled)).probability == 0.5: button.text = "L" 
-                        if next(iter(qubit.entangled)).probability == 0.75: button.text = "N" 
-                        
-                    elif qubit.probability == 0:
-                        if next(iter(qubit.entangled)).probability == 0: button.text = "B" 
-                        if next(iter(qubit.entangled)).probability == 1: button.text = "F"
-                        if next(iter(qubit.entangled)).probability == 0.25: button.text = "O" 
-                        if next(iter(qubit.entangled)).probability == 0.5: button.text = "M" 
-                        if next(iter(qubit.entangled)).probability == 0.75: button.text = "J" 
-
-                    elif qubit.probability == 0.5:
-                        if next(iter(qubit.entangled)).probability == 0: button.text = "M" 
-                        if next(iter(qubit.entangled)).probability == 1: button.text = "L"
-                        if next(iter(qubit.entangled)).probability == 0.25: button.text = "O" # forgot this one
-                        if next(iter(qubit.entangled)).probability == 0.5: button.text = "H" 
-                        if next(iter(qubit.entangled)).probability == 0.75: button.text = "J" # and this one
-
-                    elif qubit.probability == 0.75:
-                        if next(iter(qubit.entangled)).probability == 0: button.text = "J" 
-                        if next(iter(qubit.entangled)).probability == 1: button.text = "N"
-                        if next(iter(qubit.entangled)).probability == 0.25: button.text = "K" 
-                        if next(iter(qubit.entangled)).probability == 0.5: button.text = "M" # same
-                        if next(iter(qubit.entangled)).probability == 0.75: button.text = "D" # could also have one
-
-                    elif qubit.probability == 0.25:
-                        if next(iter(qubit.entangled)).probability == 0: button.text = "O" 
-                        if next(iter(qubit.entangled)).probability == 1: button.text = "I"
-                        if next(iter(qubit.entangled)).probability == 0.25: button.text = "E" # also
-                        if next(iter(qubit.entangled)).probability == 0.5: button.text = "M" # doesn't exist
-                        if next(iter(qubit.entangled)).probability == 0.75: button.text = "G" # K and G are the same
-
-
-        self.board.check_win()  
-        self.root.ids.score.text = "X's turn"
-                    
-                
-
-        self.first_qubit = None
-
-
-    
-    def checkbox_click(self, instance, value):
-        self.Computer = value
-
-    def restart(self):
-        self.player = 1
-
-        for button in self.root.ids.grid.children:
-            button.disabled = False
-            button.font_name = "States"
-            button.text = "C"
-            button.text_color = [1, 1, 1, 1]
-
-        self.board = Board()
-
-        self.root.ids.manager.current = "menu"
-
-
+# Start app
 LabelBase.register(name='States', fn_regular='./UI/QuantumStates.ttf')
-Clock.max_iteration = 1000
-
 TicTacToe().run()
