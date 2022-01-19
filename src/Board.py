@@ -91,7 +91,8 @@ class Board:
 
         self.qs.entangle(position1[0] * 3 + position1[1], position2[0] * 3 + position2[1])
 
-    def measure(self, position1=None, to_measure=set()):
+    def measure(self, position1=None, to_measure=None):
+        if to_measure is None: to_measure=set()
         positions = []
         for q in to_measure: positions.append(q.position[0] * 3 + q.position[1])
         if position1 is not None:
@@ -114,9 +115,9 @@ class Board:
         for qubit in to_measure:
             idx = qubit.position[0] * 3 + qubit.position[1]
             if result[idx] == 1:
-                self.squares[qubit.position[0], qubit.position[1]] = "X"
-            elif result[idx] == 0:
                 self.squares[qubit.position[0], qubit.position[1]] = "O"
+            elif result[idx] == 0:
+                self.squares[qubit.position[0], qubit.position[1]] = "X"
 
     def show_board(self):
         board = [[], [], []]
