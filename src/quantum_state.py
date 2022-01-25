@@ -78,7 +78,13 @@ class QuantumState:
 
             self.__append_command(next_line)
 
-        self.command_queue = []
+        measured_qubits = self.command_queue[-1]["data"][0]
+        self.command_queue = [
+            command
+            for command in self.command_queue
+            if command["id"] == "entangle" and
+            not (command["data"][0] in measured_qubits or command["data"][1] in measured_qubits)
+        ] # Filter all commands that are do not entangle unmeasured qubits
 
         result = qi_api.execute_qasm(qasm=self.qasm, backend_type=qi_backend, number_of_shots=512,
                                      full_state_projection=True)
