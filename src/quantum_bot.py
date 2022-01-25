@@ -1,3 +1,4 @@
+from math import acos, sqrt
 import os
 import numpy as np
 
@@ -58,7 +59,7 @@ def reverse_lines(str):
 
 
 def multicontrolled_toffoli(inputs, out, ancilla_start):
-    """ Helper function which generate a multi-controlled `toffoli` circuit
+    """ Helper function which generates a multi-controlled `toffoli` circuit
 
     Time complexity: O(n) whith n = len(inputs)
     """
@@ -83,6 +84,40 @@ def multicontrolled_toffoli(inputs, out, ancilla_start):
     result += reverse + "\n"
 
     return result
+
+
+def controlled_ry(angle, control, target):
+    """ Helper function which generates a controlled Ry circuit
+    """
+    result = ""
+    result += f"cnot q[{control}], q[{target}]\n"
+    result += f"ry q[{target}], {-angle / 2}\n"
+    result += f"cnot q[{control}], q[{target}]\n"
+    result += f"ry q[{target}], {angle / 2}\n"
+    return result
+
+
+def generate_w_state(qubits):
+    """ Helper function which generates a circuit to create a W-state for the given qubits
+
+    Time complexity: O(n) whith n = len(inputs)
+    """
+    # https://arxiv.org/pdf/1807.05572.pdf
+    size = len(qubits)
+
+    result = ""
+    result_dag = ""
+
+    result += f"x q[{qubits[0]}]\n"
+    for i in range(size - 1):
+        result += controlled_ry(2 * acos(sqrt(1 / (size - i))), qubits[i], qubits[i + 1])
+        result += f"cnot q[{qubits[i + 1]}], q[{qubits[i]}]\n"
+
+        result_dag += f"cnot q[{qubits[size - 1 - i]}], q[{qubits[size - 2 - i]}]\n"
+        result_dag += "\n".join(controlled_ry(-2 * acos(sqrt(1 / (i + 2))), qubits[size - 2 - i], qubits[size - 1 - i]).splitlines()[::-1]) + "\n"
+    result_dag += f"x q[{qubits[0]}]\n"
+
+    return result, result_dag
 
 
 class QuantumBot:
@@ -110,7 +145,7 @@ class QuantumBot:
             print("Invalid board state was given")
             return
 
-        win_threshold = 0.4
+        win_threshold = 0.5
         self.board_state = board_state
 
         if turn_number >= 3:
@@ -137,100 +172,31 @@ class QuantumBot:
         return int(log2(best_move))
 
 
-    def move_validation(self, out, ancilla_start):
-        """ Generate the move validation sub-circuit
-        
-        Time complexity: O(4n) with n = board_len
-
-        Args:
-            out (int): The qubit used for the final result
-            ancilla_start (int): The first qubit to use as ancilla
-            subsequent ancilla bits will use the next qubit up. No ancilla bit is left dirty.
-        """
-        result = ""
-        variable_cells = [i for i, v in enumerate(self.board_state) if v == _] # O(n)
-
-        toffoli = multicontrolled_toffoli(variable_cells, out, ancilla_start) # O(n)
-
-        variable_cells_str = ", ".join(str(i) for i in variable_cells) # O(n)
-        result += f"x q[{variable_cells_str}]\n"
-
-        for index in variable_cells: # O(n)
-            result += f"x q[{index}]\n"
-            result += toffoli
-            result += f"x q[{index}]\n"
-
-        result += f"x q[{variable_cells_str}]\n"
-
-        return result
-
-
-    def win_condition(self, out, ancilla_start):
-        """ Generate the win condition sub-circuit
-        
-        Time complexity: O(8n) with n = board_len
-
-        Args:
-            out (int): The qubit used for the final result
-            ancilla_start (int): The first qubit to use as ancilla
-            subsequent ancilla bits will use the next qubit up. No ancilla bit is left dirty.
-        """
-        result = ""
-
-        for cond in self.win_conditions: # O(8)
-            if self.board_state[cond[0]] != O and self.board_state[cond[1]] != O and self.board_state[cond[2]] != O:
-                result += multicontrolled_toffoli(cond, out, ancilla_start) # O(n)
-
-        return result
-
-
-    def winning_move_diffuser(self, out, ancilla_start):
-        """ Generate the diffuser sub-circuit for the winning move algorithm
-        
-        Time complexity: O(n) with n = board_len
-
-        Args:
-            out (int): The qubit used for the final result
-            ancilla_start (int): The first qubit to use as ancilla
-            subsequent ancilla bits will use the next qubit up. No ancilla bit is left dirty.
-        """
-        result = ""
-
-        result += f"h q[0:{self.board_len - 1}]\n"
-        result += f"x q[0:{self.board_len - 1}]\n"
-        result += multicontrolled_toffoli(list(range(self.board_len)), out, ancilla_start) # O(n)
-        result += f"x q[0:{self.board_len - 1}]\n"
-        result += f"h q[0:{self.board_len - 1}]\n"
-
-        return result
-
-
     def generate_winning_move(self):
-        """ Generate the qasm code for the winning move algorithm given the current board state
-
-        Time complexity: O(27n)
-        """
-        valid = self.move_validation(self.board_len + 1, self.board_len + 2) # O(4n)
-        win = self.win_condition(self.board_len + 2, self.board_len + 3) # O(8n)
-
-        valid_and_win = valid + "\n" + win
-        grovers_bit = f"\ntoffoli q[{self.board_len + 2}], q[{self.board_len + 1}], q[{self.board_len}]\n\n"
-
         qasm = ""
-        qasm += f"h q[0:{self.board_len}]\nz q[{self.board_len}]\n"
+        qasm += "version 1.0\n\nqubits 17\n\n"
 
-        variable_cells = [str(index) for index, value in enumerate(self.board_state) if value == _] # O(n)
-        # TODO: Get an appropriate number by calculations or heuristics
-        qasm += f"\n.grover({len(variable_cells)})\n"
-        qasm += valid_and_win + grovers_bit + reverse_lines(valid_and_win) + "\n" # O(13n)
-        qasm += self.winning_move_diffuser(self.board_len, self.board_len + 1) # O(n)
+        qasm += f".init\nh q[{self.board_len}]\nz q[{self.board_len}]\n\n"
 
-        # Not measuring is faster, but then the results will have to be filtered afterwards
-        qasm += f"\n.measurement\nmeasure_z q[{', '.join(variable_cells)}]"
+        initial_state, initial_state_dag = generate_w_state([i for i, v in enumerate(self.board_state) if v == _])
+        initial_state += f"x q[{', '.join([str(i) for i, v in enumerate(self.board_state) if v == X])}]\n\n"
+        initial_state_dag += f"x q[{', '.join([str(i) for i, v in enumerate(self.board_state) if v == X])}]\n\n"
 
-        # This circuit will always use 17 qubits for a 3x3 board with at least 1 filled square
-        # This limit is mostly defined by the multi-controlled toffoli for the diffuser
-        qasm = f"version 1.0\n\nqubits {17}\n\n" + qasm
+        qasm += initial_state
+
+        qasm += f".grover(1)\n"
+        for cond in self.win_conditions: # O(8)
+            qasm += multicontrolled_toffoli(cond, self.board_len, self.board_len + 1) # O(n)
+        qasm += "\n\n"
+
+        qasm += initial_state_dag
+        qasm += f"x q[0:{self.board_len - 1}]\n"
+        qasm += multicontrolled_toffoli(list(range(self.board_len)), self.board_len, self.board_len + 1) # O(n)
+        qasm += f"x q[0:{self.board_len - 1}]\n"
+        qasm += initial_state
+        qasm += "\n\n"
+
+        qasm += f".measurement\nmeasure_z q[{', '.join([str(i) for i, v in enumerate(self.board_state) if v == _])}]"
 
         result = execute_qasm(qasm=qasm, backend_type=qi_backend, number_of_shots=32,
                                      full_state_projection=False)
@@ -417,11 +383,4 @@ class QuantumBot:
 
         
 if __name__ == "__main__":        
-    QuantumBot = QuantumBot()
-    QuantumBot.board_state =[
-        O, _, X,
-        _, _, O,
-        X, O, _
-    ]
-    result = QuantumBot.generate_non_winning_move()
-    print(result)
+    print(generate_w_state([0, 1, 2, 3])[0])
